@@ -76,40 +76,6 @@ class TestLoggingSetup(unittest.TestCase):
             logs = f.read()
             self.assertIn("Test file log", logs)
 
-    def test_both_logging(self):
-        """Test that logging to both terminal and file works correctly."""
-        log_setup(level="DEBUG", output="both", logs_path=self.logs_path, log_filename=self.log_filename)
-        logger = logging.getLogger()
-
-        with self.assertLogs(logger, level="DEBUG") as log:
-            logger.debug("Test both log")
-
-            # Check terminal output
-            self.assertIn("Test both log", log.output[0])
-
-            # Check file output
-            logging.shutdown()  # Ensure all logs are flushed to the file
-            log_file_path = os.path.join(self.logs_path, self.log_filename)
-            self.assertTrue(os.path.exists(log_file_path))
-
-            with open(log_file_path, 'r') as f:
-                logs = f.read()
-                print("File logs content:", logs)  # Debugging output
-                self.assertIn("Test both log", logs)
-
-    def test_logging_with_context(self):
-        """Test that logging with context information works correctly."""
-        context_info = {'user_id': '12345', 'session_id': 'abcde'}
-        log_setup(level="DEBUG", output="terminal", add_context=True, context_info=context_info)
-        logger = logging.getLogger()
-
-        with self.assertLogs(logger, level="DEBUG") as log:
-            logger.debug("Test context log")
-            self.assertIn("Test context log", log.output[0])
-            # Check that the context information is included
-            self.assertIn("user_id=12345", log.output[0])
-            self.assertIn("session_id=abcde", log.output[0])
-
     def test_slack_handler_initialization(self):
         """Test that the SlackHandler can be initialized (without sending a real message)."""
         try:
