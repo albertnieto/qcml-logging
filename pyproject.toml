@@ -1,0 +1,26 @@
+[build-system]
+requires = ["setuptools>=42", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "qcml-logging"
+version = "0.1.0"
+description = "A Python library for advanced logging with support for multiple outputs and optional Slack integration."
+readme = "README.md"  # This line automatically infers the content type if the file has a known extension
+authors = [
+    { name = "Albert Nieto", email = "nietom.albert@gmail.com" }
+]
+license = { text = "Apache-2.0" }
+requires-python = ">=3.6"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: Apache Software License",
+    "Operating System :: OS Independent"
+]
+dependencies = []
+
+[project.optional-dependencies]
+slack = ["slack_sdk>=3.0.0"]
+
+[project.urls]
+Homepage = "https://github.com/albertnieto/qcml-logging"
