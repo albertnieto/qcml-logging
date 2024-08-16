@@ -1,3 +1,17 @@
+# Copyright 2024 Albert Nieto
+
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+
+#     http://www.apache.org/licenses/LICENSE-2.0
+
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 import unittest
 import logging
 import os
@@ -9,24 +23,34 @@ class TestLoggingSetup(unittest.TestCase):
 
     def setUp(self):
         """Set up test environment before each test."""
-        # Set up paths and filenames for tests
         self.logs_path = "test_logs"
         self.log_filename = "test.log"
         
-        # Ensure logs directory is clean before each test
         if os.path.exists(self.logs_path):
             for file in os.listdir(self.logs_path):
                 file_path = os.path.join(self.logs_path, file)
-                os.unlink(file_path)
+                try:
+                    os.unlink(file_path)
+                except PermissionError:
+                    pass
         else:
             os.makedirs(self.logs_path)
 
+        # Reset logger to avoid conflicts between tests
+        logging.shutdown()
+        for handler in logging.root.handlers[:]:
+            logging.root.removeHandler(handler)
+
     def tearDown(self):
         """Clean up test environment after each test."""
+        logging.shutdown()
         if os.path.exists(self.logs_path):
             for file in os.listdir(self.logs_path):
                 file_path = os.path.join(self.logs_path, file)
-                os.unlink(file_path)
+                try:
+                    os.unlink(file_path)
+                except PermissionError:
+                    pass
             os.rmdir(self.logs_path)
 
     def test_terminal_logging(self):
@@ -64,11 +88,13 @@ class TestLoggingSetup(unittest.TestCase):
             self.assertIn("Test both log", log.output[0])
 
             # Check file output
+            logging.shutdown()  # Ensure all logs are flushed to the file
             log_file_path = os.path.join(self.logs_path, self.log_filename)
             self.assertTrue(os.path.exists(log_file_path))
 
             with open(log_file_path, 'r') as f:
                 logs = f.read()
+                print("File logs content:", logs)  # Debugging output
                 self.assertIn("Test both log", logs)
 
     def test_logging_with_context(self):
@@ -80,12 +106,12 @@ class TestLoggingSetup(unittest.TestCase):
         with self.assertLogs(logger, level="DEBUG") as log:
             logger.debug("Test context log")
             self.assertIn("Test context log", log.output[0])
+            # Check that the context information is included
             self.assertIn("user_id=12345", log.output[0])
             self.assertIn("session_id=abcde", log.output[0])
 
     def test_slack_handler_initialization(self):
         """Test that the SlackHandler can be initialized (without sending a real message)."""
-        # Assuming slack_sdk is installed and available
         try:
             from slack_sdk import WebClient
             slack_client = WebClient(token="dummy_token")

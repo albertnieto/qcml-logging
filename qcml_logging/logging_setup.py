@@ -20,10 +20,9 @@ environments, including support for terminal, file, and Slack logging.
 """
 
 import logging
+import os
 import sys
-from .formatters import setup_formatter
-from .handlers import setup_handlers, setup_slack_handler
-from .context import ContextFilter
+from typing import Optional, List, Dict
 
 try:
     from slack_sdk.errors import SlackApiError
@@ -31,7 +30,18 @@ try:
 except ImportError:
     slack_available = False
 
-def setup_logging_filters(logger, keyword_filters, context_info):
+# Handle imports correctly depending on how the module is executed
+if __name__ == "__main__" and __package__ is None:
+    sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+    from formatters import setup_formatter
+    from handlers import setup_handlers, setup_slack_handler
+    from context import ContextFilter
+else:
+    from .formatters import setup_formatter
+    from .handlers import setup_handlers, setup_slack_handler
+    from .context import ContextFilter
+
+def setup_logging_filters(logger: logging.Logger, keyword_filters: Optional[List[str]], context_info: Optional[Dict[str, str]]):
     """
     Set up logging filters based on keywords and context information.
 
@@ -51,7 +61,7 @@ def setup_logging_filters(logger, keyword_filters, context_info):
         context_filter = ContextFilter(context_info)
         logger.addFilter(context_filter)
 
-def setup_async_logging(logger):
+def setup_async_logging(logger: logging.Logger):
     """
     Set up asynchronous logging by handling uncaught exceptions.
 
@@ -65,12 +75,24 @@ def setup_async_logging(logger):
         logger.critical("Uncaught exception", exc_info=(exc_type, exc_value, exc_traceback))
     sys.excepthook = handle_exception
 
-def log_setup(level="ERROR", hide_logs=None, output="both", logs_path="logs/",
-              log_filename=None, max_bytes=1048576, backup_count=3, 
-              terminal_level=None, file_level=None, 
-              log_format=None, use_json=False, keyword_filters=None, 
-              use_color=True, asynchronous=True, add_context=False, context_info=None,
-              slack_notify=False, slack_credentials=None):
+def log_setup(level: str = "ERROR", 
+              hide_logs: Optional[List[str]] = None, 
+              output: str = "both", 
+              logs_path: str = "logs/",
+              log_filename: Optional[str] = None, 
+              max_bytes: int = 1048576, 
+              backup_count: int = 3, 
+              terminal_level: Optional[str] = None, 
+              file_level: Optional[str] = None, 
+              log_format: Optional[str] = None, 
+              use_json: bool = False, 
+              keyword_filters: Optional[List[str]] = None, 
+              use_color: bool = True, 
+              asynchronous: bool = True, 
+              add_context: bool = False, 
+              context_info: Optional[Dict[str, str]] = None,
+              slack_notify: bool = False, 
+              slack_credentials: Optional[List[str]] = None):
     """
     Set up logging with various options including terminal, file, and Slack logging.
 
@@ -95,6 +117,23 @@ def log_setup(level="ERROR", hide_logs=None, output="both", logs_path="logs/",
         slack_credentials (list): Slack API token and channel as a list. Required if slack_notify is True.
     """
     
+    # Safety checks
+    if output not in {"terminal", "file", "both"}:
+        raise ValueError(f"Invalid output value: {output}. Must be 'terminal', 'file', or 'both'.")
+    
+    if slack_notify and slack_credentials is None:
+        raise ValueError("Slack notifications are enabled, but no Slack credentials were provided.")
+    
+    if output in {"file", "both"} and log_filename is None:
+        log_filename = "default.log"
+        logging.warning("No log filename provided. Defaulting to 'default.log'.")
+
+    if not isinstance(max_bytes, int) or max_bytes <= 0:
+        raise ValueError("max_bytes must be a positive integer.")
+
+    if not isinstance(backup_count, int) or backup_count < 0:
+        raise ValueError("backup_count must be a non-negative integer.")
+
     # Default terminal and file levels to the main logging level
     terminal_level = terminal_level or level
     file_level = file_level or level
@@ -144,35 +183,59 @@ def log_setup(level="ERROR", hide_logs=None, output="both", logs_path="logs/",
     logger.info("Logging is set up.")
 
 if __name__ == "__main__":
+
+    def inspect_logger(logger):
+        print(f"Logger Name: {logger.name}")
+        print(f"Logger Level: {logging.getLevelName(logger.level)}")
+        print("Handlers:")
+        for handler in logger.handlers:
+            print(f"  - {type(handler).__name__} at {logging.getLevelName(handler.level)} level")
+            if isinstance(handler, logging.StreamHandler):
+                print("  - This is a StreamHandler (for terminal output).")
+            elif isinstance(handler, logging.FileHandler):
+                print("  - This is a FileHandler (for file output).")
+            # Explicitly flush the handler to ensure logs are written
+            handler.flush()
+
     # Example context information
     context_info = {
         'user_id': 'example_user',
         'session_id': 'example_session'
     }
 
-    # Example Slack credentials (use environment variables for real use cases)
-    slack_token = "your-slack-token"  # Replace with your Slack API token
-    slack_channel = "#example-channel"
-    slack_credentials = [slack_token, slack_channel]
-
-    # Run a basic logging setup as an example
     log_setup(
         level="DEBUG",
         output="both",
+        file_level="DEBUG",
+        terminal_level="DEBUG",
         logs_path="example_logs",
+        log_filename="default.log",  # Explicitly setting the log file name
         use_json=False,
         keyword_filters=["example", "test"],
         use_color=True,
         asynchronous=True,
         add_context=True,
         context_info=context_info,
-        slack_notify=False,  # Set to True to enable Slack notifications
-        slack_credentials=slack_credentials
+        slack_notify=False
     )
 
+    # Get the root logger
+    logger = logging.getLogger()
+    logger.setLevel(logging.DEBUG)  # Explicitly set to DEBUG level
+    logger.propagate = False  # Disable propagation to avoid interference
+
+    # Inspect the logger configuration
+    inspect_logger(logger)
+
     # Example logging messages
-    logging.debug("This is a debug message.")
-    logging.info("This is an info message.")
-    logging.warning("This is a warning message.")
-    logging.error("This is an error message.")
-    logging.critical("This is a critical message.")
+    logger.debug("This is a debug message.")
+    logger.info("This is an info message.")
+    logger.warning("This is a warning message.")
+    logger.error("This is an error message.")
+    logger.critical("This is a critical message.")
+
+    # Ensure all handlers flush their buffers
+    for handler in logger.handlers:
+        handler.flush()
+
+    print("Logging complete. Check the terminal and log file.")
